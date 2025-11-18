@@ -10,10 +10,28 @@
 // and a single dependent variable (y)
 // y0: initial condition
 // nsteps, x0, xmax are used to set the range and the step size
-TGraph RK1Solve(double (*f)(double x, double y), double y0,
-		int nsteps, double x0, double xmax);
+TGraph RK1Solve(
+	double (*dy_dx)(double x, double y),
+	double x0, 
+	double y0,
+	const unsigned int nsteps, 
+	double xmax
+);
 
+TGraph RK2Solve(
+	double (*f)(double x, double y),
+	double x0, 
+	double y0,
+	const unsigned int nsteps, 
+	double xmax
+);
 
-TGraph RK2Solve(double (*f)(double x, double y), double y0,
-		int nsteps, double x0, double xmax);
+TGraph RK4Solve(
+	double (*f)(double x, double y),
+	double x0, 
+	double y0,
+	const unsigned int nsteps, 
+	double xmax
+);
+
 

@@ -8,6 +8,9 @@
 #include "TCanvas.h"
 #include <iostream>
 #include <cstdio>
+#include <cmath> 
+#include <TAxis.h> 
+#include <TLine.h>
 
 using namespace std;
 
@@ -21,14 +24,28 @@ double fun2(double x, double y){
   return -y/x-2/(x*x);  // f = y'(x,y) = -y(x)/x - 2/x^2 
 }                       // -2*log(|x|)/x+2/x  ; with initial condition y(0)=2
 
+//bernouli equation
+double f_bernouli(double x, double y){
+  return y*(2./x) - (x*x*y*y); 
+}
+//
+
 int main(int argc, char **argv){
   TApplication theApp("App", &argc, argv); // init ROOT App for displays
 
+  const double x_min = 0.1; 
+  const double x_max = 4.0;
+
+  const double y0    = 0.1;
+  
+  const unsigned int npts = 15; 
+
   // solve our DEQ using RK1 or RK2 methods!
   // Two examples are given.  Choose a function for testing
-  TGraph tg1=RK1Solve(fun1,3,30,0,3);                     // initial condition y(0)=3
-  TGraph tg2=RK2Solve(fun1,3,30,0,3);
-  TF1 fun_sol=TF1("fun_sol","3*exp(-2*x)",0,3);           // exact solution
+  TGraph tg1=RK1Solve(f_bernouli, x_min, y0, npts, x_max);                     // initial condition y(0)=3
+  TGraph tg2=RK2Solve(f_bernouli, x_min, y0, npts, x_max);
+  TGraph tg4=RK4Solve(f_bernouli, x_min, y0, npts, x_max);
+  TF1 fun_sol=TF1("fun_sol","pow(x,2)/(pow(x,5)/5. + 0.1)",x_min,x_max);           // exact solution
   //TGraph tg1=RK1Solve(fun2,2,100,1,100);                // initial condition y(1)=2
   //TGraph tg2=RK2Solve(fun2,2,100,1,100);
   //TF1 fun_sol=TF1("fun_sol","-2*log(x)/x+2/x",1,100);   // exact solution
@@ -41,25 +58,38 @@ int main(int argc, char **argv){
   // ******************************************************************************
 
   TCanvas *c1 = new TCanvas("c1","DEQ solutions",dw,dh);
+  c1->Divide(1,2); 
 
   tg1.SetMarkerSize(0.015*dh/8);  // size scale: 1 = 8 pixels, so here we choose the size to be 1.5% of the window height
   tg2.SetMarkerSize(0.015*dh/8);
+  tg4.SetMarkerSize(0.015*dh/8);
+
+  tg4.GetXaxis()->SetRangeUser(0., 4.);
+  
+
   tg1.SetMarkerStyle(kFullTriangleUp);
   tg2.SetMarkerStyle(kFullTriangleDown);
-  tg1.SetMarkerColor(kRed);
-  tg2.SetMarkerColor(kGreen-2);
+  tg4.SetMarkerStyle(kOpenSquare);
+  
+  tg1.SetMarkerColor(kRed);     tg1.SetLineColor(kRed);
+  tg2.SetMarkerColor(kGreen-2); tg2.SetLineColor(kGreen-2);
+  tg4.SetMarkerColor(kBlue);    tg4.SetLineColor(kBlue);
+  
   fun_sol.SetLineColor(kBlack);
   fun_sol.SetLineStyle(2);
   
   // plot the results
-  tg1.SetTitle("ODE demo;x;y");
-  tg1.Draw("AP");
-  tg2.Draw("P");
+  c1->cd(1);
+  tg4.SetTitle("ODE demo: #partial y = 2y/x - (xy)^{2};x;y");
+  tg4.Draw("AP SAME"); 
+  tg1.Draw("P SAME");
+  tg2.Draw("P SAME");
   fun_sol.Draw("same");
   
   TLegend *tl = new TLegend(0.6,0.7,0.9,0.9);
   tl->AddEntry(&tg1,"RK1 Solution","p");
   tl->AddEntry(&tg2,"RK2 Solution","p");
+  tl->AddEntry(&tg4,"RK4 Solution","p"); 
   tl->AddEntry(&fun_sol,"Exact Solution","l");
   tl->Draw();
   c1->Draw();
@@ -77,9 +107,39 @@ int main(int argc, char **argv){
     fprintf(fp,"%9.4lf %9.4lf %9.4lf %9.4lf\n",x[i],y1[i],y2[i],fun_sol.Eval(x[i]));
   }
   fclose(fp);
+
+  //______________________________________________________________________________________________
+  auto Compute_residuals = [npts, &fun_sol](const TGraph &g)
+  {
+    //make copies of our data
+    const double* Xptr = g.GetX(); 
+    const double* Yptr = g.GetY(); 
+    vector<double> X( Xptr, Xptr+npts-1 ); 
+    vector<double> Y( Yptr, Yptr+npts-1 ); 
+
+    TGraph g_out(g);
+
+    for (int i=0; i<npts; i++) {
+      g_out.SetPointY(i, Y[i] - fun_sol.Eval(X[i])); 
+    }
+    
+    return g_out; 
+  };
+  //______________________________________________________________________________________________
   
+  auto tg1_resid = Compute_residuals(tg1);
+  auto tg2_resid = Compute_residuals(tg2); 
+  auto tg4_resid = Compute_residuals(tg4); 
+  
+  c1->cd(2);
+  tg1_resid.SetTitle(";x;Residuals - y");
+  tg1_resid.Draw("ALP");
+  tg4_resid.Draw("LP"); 
+  tg2_resid.Draw("LP");
+
+
   cout << "Press ^c to exit" << endl;
-  theApp.SetIdleTimer(30,".q");  // set up a failsafe timer to end the program  
+  //theApp.SetIdleTimer(30,".q");  // set up a failsafe timer to end the program  
   theApp.Run();
 }
 
